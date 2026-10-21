@@ -1,4 +1,4 @@
-name: Sync fork main from upstream
+name: Sync main from upstream
 
 on:
   schedule:
@@ -14,31 +14,38 @@ concurrency:
 
 jobs:
   sync:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/automation/sync-upstream-main-3h'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          ref: main
+          ref: automation/sync-upstream-main-3h
           fetch-depth: 0
 
-      - name: Fetch upstream main
+      - name: Fetch upstream and fork main
         run: |
           git remote add upstream https://github.com/morluto/rea.git
-          git fetch --no-tags upstream main
+          git fetch --no-tags upstream refs/heads/main:refs/remotes/upstream/main
+          git fetch --no-tags origin refs/heads/main:refs/remotes/origin/main
 
-      - name: Fast-forward fork main when safe
+      - name: Mirror upstream main into the fork
         run: |
-          if ! git merge-base --is-ancestor HEAD upstream/main; then
-            echo "::error::Fork main has diverged from upstream/main; refusing to rewrite history."
-            exit 1
+          fork_main="$(git rev-parse refs/remotes/origin/main)"
+          upstream_main="$(git rev-parse refs/remotes/upstream/main)"
+
+          if [ "$fork_main" = "$upstream_main" ]; then
+            echo "Fork main already matches upstream main."
+          else
+            git push --force-with-lease="refs/heads/main:$fork_main" origin "$upstream_main:refs/heads/main"
           fi
 
-          if [ "$(git rev-parse HEAD)" = "$(git rev-parse upstream/main)" ]; then
-            echo "Fork main is already up to date."
+      - name: Keep this default branch current
+        run: |
+          if git merge-base --is-ancestor refs/remotes/upstream/main HEAD; then
+            echo "Automation branch already contains upstream main."
             exit 0
           fi
 
-          git merge --ff-only upstream/main
-          git push origin HEAD:main
+          git merge --no-edit refs/remotes/upstream/main
+          git push origin HEAD:refs/heads/automation/sync-upstream-main-3h
