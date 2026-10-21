@@ -1,0 +1,44 @@
+name: Sync fork main from upstream
+
+on:
+  schedule:
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-upstream-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fetch upstream main
+        run: |
+          git remote add upstream https://github.com/morluto/rea.git
+          git fetch --no-tags upstream main
+
+      - name: Fast-forward fork main when safe
+        run: |
+          if ! git merge-base --is-ancestor HEAD upstream/main; then
+            echo "::error::Fork main has diverged from upstream/main; refusing to rewrite history."
+            exit 1
+          fi
+
+          if [ "$(git rev-parse HEAD)" = "$(git rev-parse upstream/main)" ]; then
+            echo "Fork main is already up to date."
+            exit 0
+          fi
+
+          git merge --ff-only upstream/main
+          git push origin HEAD:main
