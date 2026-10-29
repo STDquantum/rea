@@ -216,10 +216,11 @@ const nativeCallFacts = (
             `Breakpoints ${unresolved.join(", ")} matched no code in any image loaded while observing; their calls could not be observed.`,
           ]),
       ...(run.breakpoints.some(
-        ({ location_count: count, locations }) => locations.length < count,
+        ({ location_count: count, locations }) =>
+          locations.length < count && !breakpointLocationLimit,
       )
         ? [
-            "Breakpoints with many matching locations list only the first 64; location_count gives the total.",
+            "The breakpoint location list is incomplete; location_count gives the full matching count.",
           ]
         : []),
       ...(breakpointLocationLimit

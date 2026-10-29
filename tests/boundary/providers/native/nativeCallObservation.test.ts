@@ -250,6 +250,7 @@ describe("observe_native_calls projection: keeps locations within the metadata b
     );
     expect(result.breakpoints[0]?.location_count).toBe(65);
     expect(result.breakpoints[0]?.locations).toHaveLength(65);
+    expect(result.limitations.join(" ")).not.toContain("first 64");
     expect(result.coverage).toEqual({
       status: "complete",
       event_limit_reached: false,
@@ -304,6 +305,7 @@ describe("observe_native_calls projection: reports partial observation coverage"
     expect(result.limitations).toContain(
       "Resolved breakpoint locations exceeded the aggregate 8388608-byte (8 MiB) metadata budget; omitted locations are counted in location_count. This metadata limit does not change the process outcome. This release has no runtime override.",
     );
+    expect(result.limitations.join(" ")).not.toContain("first 64");
     expect(result.limitations.join(" ")).not.toContain("process was killed");
   });
 
