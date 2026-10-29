@@ -27,6 +27,10 @@ const fileCommands = [
   "inspect-rust-binary",
   "inspect-gpu-code-objects",
   "inspect-il2cpp-metadata",
+  "extract-artifact",
+  "inspect-asset-catalog",
+  "decode-interface-builder",
+  "trace-dylib-resolution",
 ] as const;
 
 cliTest(
