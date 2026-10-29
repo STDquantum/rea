@@ -1,3 +1,6 @@
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { registerGpuCommands } from "./cli/gpuCommands.js";
 import { registerNativeFunctionMatchingCommands } from "./cli/nativeFunctionMatchingCommands.js";
 import { registerCaptureCommands } from "./cli/captureCommands.js";
@@ -263,6 +266,153 @@ export const createCli = (
           })
         )(1);
         return Promise.resolve();
+      }
+      // Incur's Amp registration overwrites an existing rea entry (dropping its
+      // environment map) and reports success even when the settings file
+      // prevents a save. Guard that path: reject a settings file REA cannot
+      // update, back up the file, preserve the caller's environment, and verify
+      // the registration landed.
+      const ampRequested =
+        command.some(
+          (token, index) => token === "--agent" && command[index + 1] === "amp",
+        ) || command.includes("--agent=amp");
+      if (ampRequested) {
+        const settingsPath = join(homedir(), ".config", "amp", "settings.json");
+        let priorEnv: unknown;
+        let guardError: string | undefined;
+        try {
+          if (existsSync(settingsPath)) {
+            const text = readFileSync(settingsPath, "utf8");
+            const parsed = JSON.parse(text) as Record<string, unknown>;
+            const servers = parsed["amp.mcpServers"];
+            if (
+              servers !== undefined &&
+              (typeof servers !== "object" ||
+                servers === null ||
+                Array.isArray(servers))
+            )
+              guardError =
+                "amp.mcpServers must be an object in Amp settings.json.";
+            else {
+              const entry =
+                typeof servers === "object" && servers !== null
+                  ? (servers as Record<string, unknown>)["rea"]
+                  : undefined;
+              if (typeof entry === "object" && entry !== null)
+                priorEnv = (entry as Record<string, unknown>)["env"];
+              writeFileSync(`${settingsPath}.rea.backup`, text);
+            }
+          }
+        } catch (cause) {
+          guardError = `Amp settings.json is not valid JSON: ${
+            cause instanceof Error ? cause.message : String(cause)
+          }`;
+        }
+        if (guardError !== undefined) {
+          const message = `${guardError} Fix it before registering.`;
+          const output = parseCliOutputArguments(normalized);
+          if (!output.validation.ok)
+            write(renderCliOutputArgumentError(output.validation));
+          else
+            write(
+              renderCliDocument(
+                {
+                  code: "VALIDATION_ERROR",
+                  message,
+                  fieldErrors: [
+                    {
+                      code: "invalid_value",
+                      missing: false,
+                      path: "amp",
+                      message,
+                    },
+                  ],
+                },
+                output.format,
+                process.stdout.isTTY === true,
+              ),
+            );
+          (
+            options?.exit ??
+            ((code: number) => {
+              process.exitCode = code;
+            })
+          )(1);
+          return Promise.resolve();
+        }
+        const result = serveStrict(
+          normalized,
+          options ?? {},
+          (tokens, selected) =>
+            serveDeclared(tokens, selected, (declared, declaredOptions) =>
+              serve(adaptCliOutputArgumentsForIncur(declared), declaredOptions),
+            ),
+        );
+        return result.then(() => {
+          let failure: string | undefined;
+          try {
+            if (!existsSync(settingsPath))
+              failure = "Amp settings.json was not created.";
+            else {
+              const text = readFileSync(settingsPath, "utf8");
+              const parsed = JSON.parse(text) as Record<string, unknown>;
+              const servers = parsed["amp.mcpServers"];
+              if (
+                typeof servers !== "object" ||
+                servers === null ||
+                Array.isArray(servers) ||
+                !("rea" in servers)
+              )
+                failure =
+                  "Amp settings.json does not contain the rea registration after mcp add.";
+              else {
+                const entry = (servers as Record<string, unknown>)["rea"];
+                if (
+                  priorEnv !== undefined &&
+                  typeof entry === "object" &&
+                  entry !== null &&
+                  (entry as Record<string, unknown>)["env"] === undefined
+                ) {
+                  (entry as Record<string, unknown>)["env"] = priorEnv;
+                  writeFileSync(
+                    settingsPath,
+                    `${JSON.stringify(parsed, null, 2)}\n`,
+                  );
+                }
+              }
+            }
+          } catch (cause) {
+            failure = cause instanceof Error ? cause.message : String(cause);
+          }
+          if (failure !== undefined) {
+            const output = parseCliOutputArguments(normalized);
+            if (output.validation.ok)
+              write(
+                renderCliDocument(
+                  {
+                    code: "VALIDATION_ERROR",
+                    message: failure,
+                    fieldErrors: [
+                      {
+                        code: "invalid_value",
+                        missing: false,
+                        path: "amp",
+                        message: failure,
+                      },
+                    ],
+                  },
+                  output.format,
+                  process.stdout.isTTY === true,
+                ),
+              );
+            (
+              options?.exit ??
+              ((code: number) => {
+                process.exitCode = code;
+              })
+            )(1);
+          }
+        });
       }
     }
     const result = serveStrict(normalized, options ?? {}, (tokens, selected) =>
