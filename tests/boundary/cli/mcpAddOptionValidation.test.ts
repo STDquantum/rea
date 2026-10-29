@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect } from "vitest";
 
@@ -8,16 +8,17 @@ import { cliTest } from "../../support/cli/cliFixture.js";
 cliTest("mcp add rejects valued options without a value", async ({ cli }) => {
   const root = await createTestTempDirectory("rea-mcp-add-value-");
   const home = join(root, "home");
-  const environment = {
-    HOME: home,
-    USERPROFILE: home,
-    XDG_CONFIG_HOME: join(home, ".config"),
-  };
-  const run = (arguments_: readonly string[]) =>
+  const settingsPath = (selectedHome: string) =>
+    join(selectedHome, ".config", "amp", "settings.json");
+  const run = (arguments_: readonly string[], selectedHome = home) =>
     cli.run({
       arguments: [...arguments_, "--json"],
       cwd: root,
-      environment,
+      environment: {
+        HOME: selectedHome,
+        USERPROFILE: selectedHome,
+        XDG_CONFIG_HOME: join(selectedHome, ".config"),
+      },
       timeoutMs: 20_000,
     });
 
@@ -40,6 +41,9 @@ cliTest("mcp add rejects valued options without a value", async ({ cli }) => {
         }),
       ]),
     });
+    await expect(access(settingsPath(home))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   }
 
   // Incur would swallow the following flag as the option value; REA rejects it.
@@ -55,13 +59,32 @@ cliTest("mcp add rejects valued options without a value", async ({ cli }) => {
       }),
     ]),
   });
+  await expect(access(settingsPath(home))).rejects.toMatchObject({
+    code: "ENOENT",
+  });
+
+  const existingHome = join(root, "existing-home");
+  const existingSettingsPath = settingsPath(existingHome);
+  await mkdir(join(existingHome, ".config", "amp"), { recursive: true });
+  const existingSettings = '{"existing":true}\n';
+  await writeFile(existingSettingsPath, existingSettings);
+  const rejectedWithExistingSettings = await run(
+    ["mcp", "add", "--agent"],
+    existingHome,
+  );
+  expect(
+    rejectedWithExistingSettings.exitCode,
+    rejectedWithExistingSettings.stderr,
+  ).toBe(1);
+  expect(rejectedWithExistingSettings.json).toMatchObject({
+    code: "VALIDATION_ERROR",
+  });
+  expect(await readFile(existingSettingsPath, "utf8")).toBe(existingSettings);
 
   // A registration with an explicit agent still writes the Amp registration.
   const registered = await run(["mcp", "add", "--agent", "amp"]);
   expect(registered.exitCode, registered.stderr).toBe(0);
-  const settings = JSON.parse(
-    await readFile(join(home, ".config", "amp", "settings.json"), "utf8"),
-  );
+  const settings = JSON.parse(await readFile(settingsPath(home), "utf8"));
   expect(settings["amp.mcpServers"].rea).toMatchObject({
     command: expect.any(String),
   });
