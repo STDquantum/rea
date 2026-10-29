@@ -87,7 +87,10 @@ export const registerBinaryDiagnosticsCommands = (
     description:
       "Inspect an Apple .ips crash report without executing a target",
     args: z.object({
-      path: z.string().describe("Local Apple .ips crash report"),
+      path: z
+        .string()
+        .min(1)
+        .describe("Local Apple .ips crash report"),
     }),
     options: z.object({
       maxFileBytes: inspectAppleIpsInputSchema.shape.max_file_bytes,
