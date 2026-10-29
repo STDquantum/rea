@@ -14,7 +14,9 @@ const FUNCTIONS = [
 ] as const;
 
 describe("decompile-all CLI", () => {
-  cliTest(
+  // The Kuna provider is verified on Linux and macOS only; the fake provider
+  // is admitted there, so the export workflow cannot run on Windows.
+  cliTest.skipIf(process.platform === "win32")(
     "maps filters, limit and a relative output directory to the export",
     async ({ cli }) => {
       const root = await createTestTempDirectory("rea-decompile-all-cli-");
@@ -97,6 +99,42 @@ describe("decompile-all CLI", () => {
           counts: { selected: 2, written: 1, skipped: 1, remaining: 0 },
         },
       });
+    },
+  );
+
+  cliTest(
+    "rejects an empty target instead of exporting the working directory",
+    async ({ cli }) => {
+      const root = await createTestTempDirectory("rea-decompile-all-empty-");
+      const output = join(root, "out");
+      const result = await cli.run({
+        arguments: [
+          "decompile-all",
+          "",
+          "--provider",
+          "kuna",
+          "--output",
+          output,
+          "--format",
+          "json",
+        ],
+        cwd: root,
+        environment: { REA_LOG_LEVEL: "silent" },
+      });
+      expect(result.exitCode, JSON.stringify(result.json)).toBe(1);
+      expect(result.json).toMatchObject({
+        code: "VALIDATION_ERROR",
+        fieldErrors: expect.arrayContaining([
+          expect.objectContaining({
+            path: "path",
+            code: "too_small",
+            missing: false,
+          }),
+        ]),
+      });
+      // No export may start from an empty selection: the output directory must
+      // never be created for the working directory.
+      await expect(readdir(output)).rejects.toMatchObject({ code: "ENOENT" });
     },
   );
 });
