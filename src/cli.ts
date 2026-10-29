@@ -264,15 +264,18 @@ export const createCli = (
         )(1);
         return Promise.resolve();
       }
-      // Incur's `mcp add` silently skips a valued option with no value: the
-      // registration succeeds without the requested agent or command. Reject a
-      // trailing --agent/--command/-c and an empty `--flag=` form up front.
+      // Incur's `mcp add` silently skips a valued option with no value and
+      // swallows the next flag as the value: the registration succeeds without
+      // the requested agent or command. Reject a trailing --agent/--command/-c,
+      // a value position occupied by another flag, and an empty `--flag=` form
+      // up front.
       const valued = ["--agent", "--command", "-c"];
       let missingValue: string | undefined;
       for (let index = 0; index < command.length; index += 1) {
+        const next = command[index + 1];
         if (
           valued.includes(command[index]!) &&
-          command[index + 1] === undefined
+          (next === undefined || next.startsWith("-"))
         ) {
           missingValue = command[index];
           break;

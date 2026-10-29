@@ -41,6 +41,20 @@ cliTest("mcp add rejects valued options without a value", async ({ cli }) => {
     });
   }
 
+  // Incur would swallow the following flag as the option value; REA rejects it.
+  const swallowed = await run(["mcp", "add", "--command", "--agent", "amp"]);
+  expect(swallowed.exitCode, swallowed.stderr).toBe(1);
+  expect(swallowed.json).toMatchObject({
+    code: "VALIDATION_ERROR",
+    fieldErrors: expect.arrayContaining([
+      expect.objectContaining({
+        code: "invalid_value",
+        missing: false,
+        path: "command",
+      }),
+    ]),
+  });
+
   // A registration with an explicit agent still writes the Amp registration.
   const registered = await run(["mcp", "add", "--agent", "amp"]);
   expect(registered.exitCode, registered.stderr).toBe(0);
