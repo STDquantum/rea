@@ -258,6 +258,38 @@ describe("observe_native_calls projection: keeps locations within the metadata b
       unresolved_breakpoints: [],
     });
   });
+
+  it("uses a generic warning when locations are missing without a budget signal", async () => {
+    const observed = await observe(
+      new FixtureTracer(
+        ok({
+          debugger: {
+            path: "/usr/bin/lldb",
+            sha256: "a".repeat(64),
+            version: null,
+          },
+          run: run({
+            breakpoints: [
+              { index: 0, location_count: 2, locations: [LOCATION] },
+              { index: 1, location_count: 1, locations: [LOCATION] },
+            ],
+          }),
+          stdout: { text: "", bytes: 0, truncated: false, complete: true },
+          stderr: { text: "", bytes: 0, truncated: false, complete: true },
+          terminated: true,
+        }),
+      ),
+      { breakpoints: BREAKPOINTS },
+    );
+    if (!observed.ok) throw observed.error;
+    const result = nativeCallObservationResultSchema.parse(
+      observed.value.result,
+    );
+    expect(result.limitations).toContain(
+      "The breakpoint location list is incomplete; location_count gives the full matching count.",
+    );
+    expect(result.limitations.join(" ")).not.toContain("first 64");
+  });
 });
 
 describe("observe_native_calls projection: reports partial observation coverage", () => {
