@@ -224,14 +224,10 @@ const nativeCallFacts = (
         ({ location_count: count, locations }) =>
           locations.length < count && !breakpointLocationLimit,
       )
-        ? [
-            NATIVE_CALL_BREAKPOINT_LOCATION_LIST_INCOMPLETE_LIMITATION,
-          ]
+        ? [NATIVE_CALL_BREAKPOINT_LOCATION_LIST_INCOMPLETE_LIMITATION]
         : []),
       ...(breakpointLocationLimit
-        ? [
-            NATIVE_CALL_BREAKPOINT_LOCATION_BUDGET_LIMITATION,
-          ]
+        ? [NATIVE_CALL_BREAKPOINT_LOCATION_BUDGET_LIMITATION]
         : []),
       ...(trace.stdout === null || trace.stderr === null
         ? ["One or more target output captures were unavailable."]
