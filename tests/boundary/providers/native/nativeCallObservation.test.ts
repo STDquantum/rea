@@ -13,6 +13,10 @@ import type { AnalysisError } from "../../../../src/domain/analysisErrorBase.js"
 import { EvidenceIntegrityError } from "../../../../src/domain/evidenceErrors.js";
 import { nativeCallPartialObservationSchema } from "../../../../src/domain/native/nativeCallPartialObservation.js";
 import { nativeCallObservationResultSchema } from "../../../../src/domain/native/nativeCallObservation.js";
+import {
+  NATIVE_CALL_BREAKPOINT_LOCATION_BUDGET_LIMITATION,
+  NATIVE_CALL_BREAKPOINT_LOCATION_LIST_INCOMPLETE_LIMITATION,
+} from "../../../../src/native/NativeCallObservation.js";
 import { err, ok, type Result } from "../../../../src/domain/result.js";
 import type {
   NativeCallTrace,
@@ -250,7 +254,6 @@ describe("observe_native_calls projection: keeps locations within the metadata b
     );
     expect(result.breakpoints[0]?.location_count).toBe(65);
     expect(result.breakpoints[0]?.locations).toHaveLength(65);
-    expect(result.limitations.join(" ")).not.toContain("first 64");
     expect(result.coverage).toEqual({
       status: "complete",
       event_limit_reached: false,
@@ -286,9 +289,8 @@ describe("observe_native_calls projection: keeps locations within the metadata b
       observed.value.result,
     );
     expect(result.limitations).toContain(
-      "The breakpoint location list is incomplete; location_count gives the full matching count.",
+      NATIVE_CALL_BREAKPOINT_LOCATION_LIST_INCOMPLETE_LIMITATION,
     );
-    expect(result.limitations.join(" ")).not.toContain("first 64");
   });
 });
 
@@ -335,9 +337,11 @@ describe("observe_native_calls projection: reports partial observation coverage"
       unresolved_breakpoints: [],
     });
     expect(result.limitations).toContain(
-      "Resolved breakpoint locations exceeded the aggregate 8388608-byte (8 MiB) metadata budget; omitted locations are counted in location_count. This metadata limit does not change the process outcome. This release has no runtime override.",
+      NATIVE_CALL_BREAKPOINT_LOCATION_BUDGET_LIMITATION,
     );
-    expect(result.limitations.join(" ")).not.toContain("first 64");
+    expect(result.limitations).not.toContain(
+      NATIVE_CALL_BREAKPOINT_LOCATION_LIST_INCOMPLETE_LIMITATION,
+    );
     expect(result.limitations.join(" ")).not.toContain("process was killed");
   });
 
