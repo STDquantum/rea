@@ -216,6 +216,49 @@ describe("observe_native_calls projection: projects completed observations", () 
   });
 });
 
+describe("observe_native_calls projection: keeps locations within the metadata budget", () => {
+  it("projects every breakpoint location when the aggregate metadata budget allows it", async () => {
+    const locations = Array.from({ length: 65 }, (_, index) => ({
+      ...LOCATION,
+      load_address: `0x${(0x100000928 + index * 4).toString(16)}`,
+      file_address: `0x${(0x100000928 + index * 4).toString(16)}`,
+    }));
+    const observed = await observe(
+      new FixtureTracer(
+        ok({
+          debugger: {
+            path: "/usr/bin/lldb",
+            sha256: "a".repeat(64),
+            version: null,
+          },
+          run: run({
+            breakpoints: [
+              { index: 0, location_count: locations.length, locations },
+              { index: 1, location_count: 1, locations: [LOCATION] },
+            ],
+          }),
+          stdout: { text: "", bytes: 0, truncated: false, complete: true },
+          stderr: { text: "", bytes: 0, truncated: false, complete: true },
+          terminated: true,
+        }),
+      ),
+      { breakpoints: BREAKPOINTS },
+    );
+    if (!observed.ok) throw observed.error;
+    const result = nativeCallObservationResultSchema.parse(
+      observed.value.result,
+    );
+    expect(result.breakpoints[0]?.location_count).toBe(65);
+    expect(result.breakpoints[0]?.locations).toHaveLength(65);
+    expect(result.coverage).toEqual({
+      status: "complete",
+      event_limit_reached: false,
+      resource_limit_reached: false,
+      unresolved_breakpoints: [],
+    });
+  });
+});
+
 describe("observe_native_calls projection: reports partial observation coverage", () => {
   it("retains normal exit and location counts when breakpoint metadata is bounded", async () => {
     const observed = await observe(
