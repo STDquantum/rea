@@ -267,6 +267,18 @@ export const createCli = (
         )(1);
         return Promise.resolve();
       }
+      // Incur's mcp add parser only understands spaced `--agent amp` forms; an
+      // equals form like `--agent=amp` is silently ignored, which would drop
+      // the requested agent and register against the default target. Normalize
+      // equals forms back to spaced forms before handing over to Incur.
+      const serveArguments = normalized.flatMap((token) => {
+        if (token.startsWith("--agent=") || token.startsWith("--command=")) {
+          const separator = token.indexOf("=");
+          const value = token.slice(separator + 1);
+          return value === "" ? [token] : [token.slice(0, separator), value];
+        }
+        return [token];
+      });
       // Incur's Amp registration overwrites an existing rea entry (dropping its
       // environment map) and reports success even when the settings file
       // prevents a save. Guard that path: reject a settings file REA cannot
@@ -341,7 +353,7 @@ export const createCli = (
           return Promise.resolve();
         }
         const result = serveStrict(
-          normalized,
+          serveArguments,
           options ?? {},
           (tokens, selected) =>
             serveDeclared(tokens, selected, (declared, declaredOptions) =>

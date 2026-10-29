@@ -57,6 +57,16 @@ cliTest(
     expect(await readFile(`${settingsPath}.rea.backup`, "utf8")).toBe(original);
     expect(after.theme).toBe("dark");
 
+    // The equals form --agent=amp is parsed as a spaced form before Incur sees
+    // it, so the Amp registration lands and keeps the environment map.
+    const equals = await run(["mcp", "add", "--agent=amp"]);
+    expect(equals.exitCode, equals.stderr).toBe(0);
+    const afterEquals = JSON.parse(await readFile(settingsPath, "utf8"));
+    expect(afterEquals["amp.mcpServers"].rea).toMatchObject({
+      command: expect.any(String),
+      env: { KEEP_ME: "1" },
+    });
+
     // A malformed settings file is rejected instead of reporting success.
     const broken = join(root, "broken");
     const brokenSettings = ampSettings(broken);
