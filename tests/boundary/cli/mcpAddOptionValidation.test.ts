@@ -25,6 +25,7 @@ cliTest("mcp add rejects valued options without a value", async ({ cli }) => {
     ["--agent", "agent"],
     ["--command", "command"],
     ["-c", "command"],
+    ["-c=", "command"],
     ["--agent=", "agent"],
   ] as const) {
     const result = await run(["mcp", "add", flag]);

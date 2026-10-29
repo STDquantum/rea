@@ -283,14 +283,18 @@ export const createCli = (
       }
       const emptyValue = command.find(
         (token) =>
-          (token.startsWith("--agent=") || token.startsWith("--command=")) &&
+          (token.startsWith("--agent=") ||
+            token.startsWith("--command=") ||
+            token.startsWith("-c=")) &&
           token.length === token.indexOf("=") + 1,
       );
       if (missingValue !== undefined || emptyValue !== undefined) {
         const flag = missingValue ?? emptyValue!;
         const message = `Missing value for flag: ${flag.replace(/=.*$/, "")}`;
         const field =
-          flag.includes("command") || flag === "-c" ? "command" : "agent";
+          flag.includes("command") || flag === "-c" || flag.startsWith("-c=")
+            ? "command"
+            : "agent";
         const output = parseCliOutputArguments(normalized);
         if (!output.validation.ok)
           write(renderCliOutputArgumentError(output.validation));
