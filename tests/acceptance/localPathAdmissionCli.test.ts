@@ -31,6 +31,7 @@ const fileCommands = [
   "inspect-asset-catalog",
   "decode-interface-builder",
   "trace-dylib-resolution",
+  "inspect-keyed-archive",
 ] as const;
 
 cliTest(
