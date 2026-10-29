@@ -265,6 +265,52 @@ export const createCli = (
         return Promise.resolve();
       }
     }
+    if (command[builtin] === "setup") {
+      // Incur coerces every `--boolean=value` form with `value === 'true'`,
+      // silently turning `--dry-run=abc` and `--dry-run=` into false. Reject
+      // those values here, before they can approve a write.
+      const invalid = normalized.find(
+        (token) =>
+          token.startsWith("--dry-run=") &&
+          !(token.slice("--dry-run=".length) === "true") &&
+          !(token.slice("--dry-run=".length) === "false"),
+      );
+      if (invalid !== undefined) {
+        const value = invalid.slice("--dry-run=".length);
+        const message = `Invalid value for --dry-run: "${value}". Expected true, false, or no value.`;
+        const write =
+          options?.stdout ?? ((text: string) => process.stdout.write(text));
+        const output = parseCliOutputArguments(normalized);
+        if (!output.validation.ok)
+          write(renderCliOutputArgumentError(output.validation));
+        else
+          write(
+            renderCliDocument(
+              {
+                code: "VALIDATION_ERROR",
+                message,
+                fieldErrors: [
+                  {
+                    code: "invalid_value",
+                    missing: false,
+                    path: "dryRun",
+                    message,
+                  },
+                ],
+              },
+              output.format,
+              process.stdout.isTTY === true,
+            ),
+          );
+        (
+          options?.exit ??
+          ((code: number) => {
+            process.exitCode = code;
+          })
+        )(1);
+        return Promise.resolve();
+      }
+    }
     const result = serveStrict(normalized, options ?? {}, (tokens, selected) =>
       serveDeclared(tokens, selected, (declared, declaredOptions) =>
         serve(adaptCliOutputArgumentsForIncur(declared), declaredOptions),
