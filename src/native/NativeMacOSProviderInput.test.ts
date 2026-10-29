@@ -1,7 +1,6 @@
+import { describe, expect, it } from "vitest";
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
-import { describe, expect, it } from "vitest";
 
 import { nativeMacOSCapabilities } from "./NativeMacOSProviderMetadata.js";
 import { NativeMacOSProvider } from "./NativeMacOSProvider.js";
@@ -99,8 +98,8 @@ describe("native dispatch metadata input boundary", () => {
 it.each(["inspect_macho", "list_architectures"] as const)(
   "retains unreadable lipo output as an output failure for %s",
   async (operation) => {
-    const directory = await createTestTempDirectory("rea-lipo-output-");
-    const path = join(directory, "fixture");
+    const root = await createTestTempDirectory("rea-macho-lipo-output-");
+    const path = join(root, "fixture.macho");
     await writeFile(path, inspectionImage());
     const client = new NativeMacOSProvider(
       {},
